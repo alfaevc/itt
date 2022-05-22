@@ -65,10 +65,6 @@ def action_feed_forward(action_net, action):#have to separate feed_forward from 
     latent_action = x.detach().numpy()
     return latent_action
 
-def one_get_state_net(theta, state_dim, nA):
-    state_net = one_tower(state_dim, nA)
-    update_nn_params(state_net, theta)
-    return state_net
 
 def twin_get_state_net(theta, state_dim, nA):
     action_net = action_tower(nA)
@@ -82,6 +78,17 @@ def get_action_net(theta, nA):
     action_nn_dim = get_nn_dim(action_net)
     update_nn_params(action_net,theta[:action_nn_dim])
     return action_net
+
+def one_get_state_net(theta, state_dim, nA):
+    state_net = one_tower(state_dim, nA)
+    update_nn_params(state_net, theta)
+    return state_net
+
+def standard_get_state_net(theta, state_dim, nA):
+    state_net = state_tower(state_dim, nA)
+    update_nn_params(state_net, theta)
+    return state_net
+
     
 def get_latent_actions(actions_arr,theta):
     action_net = get_action_net(theta)
@@ -94,7 +101,8 @@ def get_theta_dim(state_dim, nA):
     action_nn_dim = get_nn_dim(action_net)
     return action_nn_dim+state_nn_dim
 
-#############################################################################################################################################
+"""Policy Interface
+"""
 
 def twin_energy_action(actions_arr, latent_actions, latent_state):
     energies = latent_actions@latent_state
@@ -120,7 +128,7 @@ def ttF(theta, gamma=1, max_step=5e3):
     state_net = twin_get_state_net(theta, state_dim, nA)
     action_net = get_action_net(theta, nA)
     while not done:
-        latent_state = state_feed_forward(state_net,state)
+        latent_state = state_feed_forward(state_net, state)
         actions_arr = np.random.uniform(-1,1,size=(min(1000,5**nA),nA))
         latent_actions = action_feed_forward(action_net,actions_arr)
         action = twin_energy_action(actions_arr, latent_actions, latent_state)
@@ -138,7 +146,7 @@ def otF(theta, gamma=1, max_step=5e3):
     steps_count=0#cannot use global var here because subprocesses cannot edit global var
     state_net = one_get_state_net(theta, state_dim, nA)
     while not done:
-        action = state_feed_forward(state_net,state)
+        action = state_feed_forward(state_net, state)
         state, reward, done, _ = env.step(action)
         steps_count+=1
         G += reward * discount
@@ -151,7 +159,7 @@ def sF(theta, gamma=1, max_step=5e3):
     discount = 1
     state = env.reset()
     steps_count=0#cannot use global var here because subprocesses cannot edit global var
-    state_net = one_get_state_net(theta, state_dim, nA)
+    state_net = standard_get_state_net(theta, state_dim, nA)
     while not done:
         action = state_feed_forward(state_net,state)
         state, reward, done, _ = env.step(action)
@@ -217,7 +225,7 @@ def seval(theta):
     a_dim = np.arange(nA)
     state_dim = state.size
     global time_step_count
-    state_net = one_get_state_net(theta, state_dim, nA)
+    state_net = standard_get_state_net(theta, state_dim, nA)
     while not done:
         action = state_feed_forward(state_net, state)
         state, reward, done, _ = env.step(action)
@@ -225,8 +233,8 @@ def seval(theta):
         G += reward
     return G
 
-#############################################################################################################################################
-
+"""Main ES Algorithm 
+"""
 def orthogonal_epsilons(N,dim):
     epsilons_N=np.zeros((math.ceil(N/dim)*dim,dim))    
     for i in range(0,math.ceil(N/dim)):
