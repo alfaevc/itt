@@ -22,7 +22,6 @@ def action_energy_loss(latent_actions, latent_states):
     return loss
 
 
-
 class Log(object):  
     def __init__(self, env):
         self.env = env
